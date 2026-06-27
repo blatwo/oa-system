@@ -1,0 +1,21 @@
+============================================================
+项目状态达成条件 — QA 集成测试
+API Base: http://localhost:8089/api
+============================================================
+
+--- SETUP ---
+  测试项目: id=503, name=hg-兰州中介-吕华5907, status=进行中
+    返回 0 条条件
+    创建条件 IDs: [86, 87, 88]
+    勾选后: is_met=1, met_date=2026-06-27 15:07:03
+    取消后: is_met=0, met_date=
+    can_change=False, met=0/3
+    unmet_list=['所有功能测试通过', '客户确认验收', '文档交付完成']
+    can_change=True, met=3/3
+    项目当前状态: 进行中
+    返回错误信息: {"detail":"还有 3 项条件未达成：所有功能测试通过、客户确认验收、文档交付完成"}...
+    状态变更成功: hg-兰州中介-吕华5907 → 已完成
+    日志记录: action=status_change, from=进行中 → to=已完成
+    日志中的 action 类型: {'condition_met', 'status_change', 'condition_unmet'}
+    匹配的 action 类型: {'condition_met', 'status_change', 'condition_unmet'}
+    错误信息: {"detail":"该项目未配置\"已完成\"状态的达成条件，请先在\"达成条件\"页签中设置条件。"}

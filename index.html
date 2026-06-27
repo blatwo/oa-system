@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>瀚高工作记录系统</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>
+      // ===== Global Frontend Error Capture =====
+      window.__sendError = function(msg, stack, component) {
+        try {
+          var xhr = new XMLHttpRequest();
+          xhr.open('POST', '/api/logs/frontend', true);
+          xhr.setRequestHeader('Content-Type', 'application/json');
+          xhr.send(JSON.stringify({
+            message: msg || 'Unknown error',
+            stack: stack || '',
+            url: window.location.href,
+            component: component || ''
+          }));
+        } catch(e) { /* silent */ }
+      };
+      window.onerror = function(msg, url, line, col, err) {
+        var stack = err && err.stack ? err.stack : (msg + ' at ' + line + ':' + col);
+        window.__sendError(String(msg), stack, '');
+      };
+      window.addEventListener('unhandledrejection', function(e) {
+        window.__sendError(e.reason ? String(e.reason) : 'Unhandled Promise rejection', '');
+      });
+    </script>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

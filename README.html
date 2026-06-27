@@ -1,0 +1,1350 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OA 系统技术文档</title>
+<style>
+  :root { --bg: #fff; --text: #24292f; --border: #d0d7de; --code-bg: #f6f8fa; --link: #0969da; --h-border: #d8dee4; --table-stripe: #f6f8fa; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC', sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; max-width: 860px; margin: 0 auto; padding: 32px 24px; }
+  h1 { font-size: 1.8em; border-bottom: 1px solid var(--h-border); padding-bottom: .3em; margin: 24px 0 16px; }
+  h2 { font-size: 1.4em; border-bottom: 1px solid var(--h-border); padding-bottom: .3em; margin: 24px 0 16px; }
+  h3 { font-size: 1.15em; margin: 20px 0 12px; }
+  p { margin: 0 0 12px; }
+  pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px; padding: 16px; overflow-x: auto; margin: 0 0 16px; font-size: 0.85em; line-height: 1.5; }
+  code { font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace; font-size: 0.9em; }
+  :not(pre) > code { background: var(--code-bg); padding: 2px 6px; border-radius: 4px; }
+  table { border-collapse: collapse; width: 100%; margin: 0 0 16px; }
+  th, td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; font-size: 0.9em; }
+  th { background: var(--code-bg); font-weight: 600; }
+  tr:nth-child(even) td { background: var(--table-stripe); }
+  a { color: var(--link); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  ul, ol { padding-left: 24px; margin: 0 0 16px; }
+  li { margin: 4px 0; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+  blockquote { border-left: 4px solid #0969da; padding: 0 16px; color: #656d76; margin: 0 0 16px; }
+  strong { font-weight: 600; }
+</style>
+</head>
+<body>
+<h1 id="oa-system">瀚高工作记录系统 (OA System)</h1>
+<blockquote>
+<p>技术支持工程师工作管理平台 — 邱臣君</p>
+</blockquote>
+<hr />
+<h2 id="_1">目录</h2>
+<ul>
+<li><a href="#运行说明">运行说明</a></li>
+<li><a href="#技术栈">技术栈</a></li>
+<li><a href="#日志系统">日志系统</a></li>
+<li><a href="#模块清单">模块清单</a></li>
+<li><a href="#数据库表结构">数据库表结构</a></li>
+<li><a href="#api-端点">API 端点</a></li>
+<li><a href="#侧栏导航结构">侧栏导航结构</a></li>
+<li><a href="#开发指南">开发指南</a></li>
+</ul>
+<hr />
+<h2 id="_2">运行说明</h2>
+<pre class="codehilite"><code class="language-bash"># 启动后端 (FastAPI + SQLite)
+python server.py
+
+# 服务运行在 http://localhost:8089
+
+# 开发模式启动前端 (Vite HMR)
+npx vite
+
+# 生产构建
+npx vite build
+</code></pre>
+
+<p><strong>数据保护</strong>：<code>oa_data.db</code> 绝对禁止删除。<code>init_db()</code> 启动时自动备份到 <code>oa_data.bak.YYYYMMDD_HHMMSS</code>，保留最近 3 份。</p>
+<hr />
+<h2 id="_3">技术栈</h2>
+<table>
+<thead>
+<tr>
+<th>层面</th>
+<th>技术</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>前端框架</td>
+<td>React 18 + Vite</td>
+</tr>
+<tr>
+<td>UI 组件库</td>
+<td>MUI (Material-UI) v5</td>
+</tr>
+<tr>
+<td>数据表格</td>
+<td>MUI X DataGrid <strong>v6.20.4</strong> ⚠️</td>
+</tr>
+<tr>
+<td>状态管理</td>
+<td>React Context + useReducer</td>
+</tr>
+<tr>
+<td>后端框架</td>
+<td>FastAPI (Python)</td>
+</tr>
+<tr>
+<td>数据库</td>
+<td>SQLite (<code>oa_data.db</code>)</td>
+</tr>
+<tr>
+<td>AI 集成</td>
+<td>OpenAI 兼容 API（多模型可配）</td>
+</tr>
+<tr>
+<td>服务端口</td>
+<td>8089</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="_4">日志系统</h2>
+<p>所有日志存储在 <code>logs/</code> 目录，自动轮转（单文件 2MB，保留 5 份）：</p>
+<table>
+<thead>
+<tr>
+<th>日志文件</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>logs/app.log</code></td>
+<td>所有应用日志（INFO+），含 HTTP 请求方法/路径/状态码/耗时</td>
+</tr>
+<tr>
+<td><code>logs/error.log</code></td>
+<td>仅错误日志（ERROR+），含完整异常堆栈</td>
+</tr>
+<tr>
+<td><code>logs/frontend.log</code></td>
+<td>前端 JS 运行时错误，含组件名、错误消息、调用栈</td>
+</tr>
+</tbody>
+</table>
+<p><strong>前端错误捕获</strong>：
+- <code>window.onerror</code> 全局钩子 → 自动 POST 到 <code>/api/logs/frontend</code>
+- React <code>&lt;ErrorBoundary&gt;</code> 包裹主内容区 → 渲染错显示友好提示页 + 自动上报</p>
+<p><strong>排查问题时，直接读取日志文件即可</strong>：</p>
+<pre class="codehilite"><code class="language-bash"># 查看最近的应用日志
+tail -50 logs/app.log
+
+# 查看错误
+cat logs/error.log
+
+# 查看前端报错
+cat logs/frontend.log
+</code></pre>
+
+<hr />
+<h2 id="_5">模块清单</h2>
+<h3 id="9">一级导航（9 项）</h3>
+<table>
+<thead>
+<tr>
+<th>模块</th>
+<th>页面键</th>
+<th>组件</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>录入工作</td>
+<td><code>form</code></td>
+<td><code>WorkForm</code></td>
+<td>工作记录录入表单，两列网格布局，含 AI 智能分类</td>
+</tr>
+<tr>
+<td>工作记录列表</td>
+<td><code>list</code></td>
+<td><code>WorkList</code></td>
+<td>工作记录 DataGrid，日期/项目筛选，批量删除，JSON 导入导出</td>
+</tr>
+<tr>
+<td>项目工时统计</td>
+<td><code>stats</code></td>
+<td><code>ProjectStats</code></td>
+<td>按项目分组汇总工时 + BSC 分类统计</td>
+</tr>
+<tr>
+<td>待办事项</td>
+<td><code>todo</code></td>
+<td><code>TodoList</code></td>
+<td>过滤含 todo 字段的记录，标记完成/删除</td>
+</tr>
+<tr>
+<td>工作积压</td>
+<td><code>backlog</code></td>
+<td><code>BacklogTracker</code></td>
+<td>按项目展示积压等级看板（严重/有积压/正常）</td>
+</tr>
+<tr>
+<td>加班记录</td>
+<td><code>overtime</code></td>
+<td><code>OvertimeManager</code></td>
+<td>加班签到/签退/工时/调休/餐补/交通/报销 CRUD</td>
+</tr>
+<tr>
+<td>AI 智能分析</td>
+<td><code>ai</code></td>
+<td><code>AIAnalysis</code></td>
+<td>三种模式：项目总结/问题分析/自由提问</td>
+</tr>
+<tr>
+<td>财务报销</td>
+<td><code>expense</code></td>
+<td><code>ExpenseManager</code></td>
+<td>出差单 + 费用明细管理，含统计汇总</td>
+</tr>
+<tr>
+<td>问题记录</td>
+<td><code>issue_tracker</code></td>
+<td><code>IssueTracker</code></td>
+<td>问题/缺陷/操作记录/最佳实践追踪，关联产品版本</td>
+</tr>
+</tbody>
+</table>
+<h3 id="6">项目管理（6 项）</h3>
+<table>
+<thead>
+<tr>
+<th>模块</th>
+<th>页面键</th>
+<th>组件</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>项目信息</td>
+<td><code>project</code></td>
+<td><code>ProjectManager</code></td>
+<td>项目编码/名称/客户/ISV/状态/销售负责人 CRUD，DataGrid</td>
+</tr>
+<tr>
+<td>销售人员</td>
+<td><code>sales</code></td>
+<td><code>SalesManager</code></td>
+<td>人员 CRUD + 销售-项目关联统计</td>
+</tr>
+<tr>
+<td>用户画像</td>
+<td><code>persona</code></td>
+<td><code>PersonaManager</code></td>
+<td>按项目的商务面貌/技术面貌/痛点/关键人员/期望</td>
+</tr>
+<tr>
+<td>风险管理</td>
+<td><code>risk</code></td>
+<td><code>RiskManager</code></td>
+<td>风险类型/等级/描述/影响/缓解措施/负责人/状态</td>
+</tr>
+<tr>
+<td>里程碑管理</td>
+<td><code>wbs</code></td>
+<td><code>WbsManager</code></td>
+<td>Tab1: WBS 项管理, Tab2: WBS 场景组合配置</td>
+</tr>
+<tr>
+<td>服务器管理</td>
+<td><code>server</code></td>
+<td><code>ServerManager</code></td>
+<td>服务器信息(80+字段) + 磁盘管理(含性能指标)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="6_1">产品服务（6 项）</h3>
+<table>
+<thead>
+<tr>
+<th>模块</th>
+<th>页面键</th>
+<th>组件</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>兼容证明</td>
+<td><code>compat</code></td>
+<td><code>CompatibilityManager</code></td>
+<td>项目/应用系统/状态/环节/开具信息/适配信息</td>
+</tr>
+<tr>
+<td>兼容流程</td>
+<td><code>compat_flow</code></td>
+<td><code>CompatFlow</code></td>
+<td>Stepper 展示，兼容环节通过字典维护</td>
+</tr>
+<tr>
+<td>产品规划</td>
+<td><code>plan</code></td>
+<td><code>ProductPlanManager</code></td>
+<td>关联产品目录三级分类，状态(规划中/开发中/已发布/已下线)</td>
+</tr>
+<tr>
+<td>产品超市</td>
+<td><code>release</code></td>
+<td><code>ProductMarketplace</code></td>
+<td>产品版本/IP/销量/适配数/评分展示，支持排序</td>
+</tr>
+<tr>
+<td>产品目录</td>
+<td><code>catalog</code></td>
+<td><code>ProductCatalogManager</code></td>
+<td>三级树形层级（大类/系列/版本），CRUD</td>
+</tr>
+<tr>
+<td>服务目录</td>
+<td><code>svc</code></td>
+<td><code>ServiceCatalogManager</code></td>
+<td>三级树形层级（服务大类/分类/子项），CRUD</td>
+</tr>
+</tbody>
+</table>
+<h3 id="4">字典维护（4 项）</h3>
+<table>
+<thead>
+<tr>
+<th>模块</th>
+<th>页面键</th>
+<th>组件</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>常规字典</td>
+<td><code>dict</code></td>
+<td><code>DictManager</code></td>
+<td>Tab: 字典分类管理 + 字典项管理</td>
+</tr>
+<tr>
+<td>优先级准则</td>
+<td><code>priority</code></td>
+<td><code>PriorityCriteria</code></td>
+<td>重要/不重要/紧急/不紧急四象限</td>
+</tr>
+<tr>
+<td>典型案例库</td>
+<td><code>issues</code></td>
+<td><code>TypicalIssues</code></td>
+<td>产品/场景/影响/发现人/服务分类</td>
+</tr>
+<tr>
+<td>LLM 模型管理</td>
+<td><code>llm</code></td>
+<td><code>LLMProfiles</code></td>
+<td>多模型配置/测试连接/设为默认</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="_6">数据库表结构</h2>
+<p>总计 <strong>25 张表</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>表名</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>work_records</code></td>
+<td>工作记录（主表）</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>dictionaries</code></td>
+<td>字典项</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>dict_categories</code></td>
+<td>字典分类</td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>projects</code></td>
+<td>项目信息</td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>sales</code></td>
+<td>销售人员</td>
+</tr>
+<tr>
+<td>6</td>
+<td><code>llm_profiles</code></td>
+<td>LLM 模型配置</td>
+</tr>
+<tr>
+<td>7</td>
+<td><code>risks</code></td>
+<td>风险管理</td>
+</tr>
+<tr>
+<td>8</td>
+<td><code>expense_claims</code></td>
+<td>报销单（旧平铺表，保留历史数据）</td>
+</tr>
+<tr>
+<td>9</td>
+<td><code>trips</code></td>
+<td>出差单</td>
+</tr>
+<tr>
+<td>10</td>
+<td><code>trip_expenses</code></td>
+<td>出差费用明细（FK → trips）</td>
+</tr>
+<tr>
+<td>11</td>
+<td><code>issue_records</code></td>
+<td>问题记录</td>
+</tr>
+<tr>
+<td>12</td>
+<td><code>servers</code></td>
+<td>服务器信息（80+ 字段）</td>
+</tr>
+<tr>
+<td>13</td>
+<td><code>server_disks</code></td>
+<td>服务器磁盘信息（FK → servers）</td>
+</tr>
+<tr>
+<td>14</td>
+<td><code>priority_criteria</code></td>
+<td>优先级准则</td>
+</tr>
+<tr>
+<td>15</td>
+<td><code>typical_issues</code></td>
+<td>典型案例库</td>
+</tr>
+<tr>
+<td>16</td>
+<td><code>wbs_items</code></td>
+<td>WBS 项</td>
+</tr>
+<tr>
+<td>17</td>
+<td><code>wbs_scenarios</code></td>
+<td>WBS 场景</td>
+</tr>
+<tr>
+<td>18</td>
+<td><code>wbs_scenario_items</code></td>
+<td>WBS 场景-项关联</td>
+</tr>
+<tr>
+<td>19</td>
+<td><code>personas</code></td>
+<td>用户画像</td>
+</tr>
+<tr>
+<td>20</td>
+<td><code>product_catalog</code></td>
+<td>产品目录（三级层级）</td>
+</tr>
+<tr>
+<td>21</td>
+<td><code>product_plans</code></td>
+<td>产品规划</td>
+</tr>
+<tr>
+<td>22</td>
+<td><code>product_releases</code></td>
+<td>产品发布/超市</td>
+</tr>
+<tr>
+<td>23</td>
+<td><code>service_catalog</code></td>
+<td>服务目录（三级层级）</td>
+</tr>
+<tr>
+<td>24</td>
+<td><code>overtimer</code></td>
+<td>加班记录</td>
+</tr>
+<tr>
+<td>25</td>
+<td><code>compatibility_certs</code></td>
+<td>兼容证明</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>关键表字段说明见下方 API 章节，详细 PRAGMA 请查看 <code>init_db()</code> 函数。</strong></p>
+</blockquote>
+<hr />
+<h2 id="api">API 端点</h2>
+<p>所有后端 API 共约 <strong>70 个路由</strong>，按模块分组：</p>
+<h3 id="_7">工作记录</h3>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>URL</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET</td>
+<td><code>/api/records</code></td>
+<td>列表（日期/项目筛选）</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/records</code></td>
+<td>创建</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/api/records/{rid}</code></td>
+<td>更新</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/api/records/{rid}</code></td>
+<td>删除</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/records/batch-delete</code></td>
+<td>批量删除</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_8">统计与待办</h3>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>URL</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET</td>
+<td><code>/api/stats</code></td>
+<td>项目工时统计</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/todos</code></td>
+<td>待办事项（按项目筛选）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_9">积压分析</h3>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>URL</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET</td>
+<td><code>/api/backlog</code></td>
+<td>积压评分看板</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_10">加班</h3>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>URL</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET</td>
+<td><code>/api/overtime</code></td>
+<td>列表</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/overtime</code></td>
+<td>创建</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/api/overtime/{oid}</code></td>
+<td>更新</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/api/overtime/{oid}</code></td>
+<td>删除</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_11">兼容证明</h3>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>URL</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET</td>
+<td><code>/api/compatibility-certs</code></td>
+<td>列表</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/compatibility-certs</code></td>
+<td>创建</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/api/compatibility-certs/{cid}</code></td>
+<td>更新</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/api/compatibility-certs/{cid}</code></td>
+<td>删除</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_12">字典</h3>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>URL</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET</td>
+<td><code>/api/dicts</code></td>
+<td>所有字典项</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/dicts/{category}</code></td>
+<td>按分类</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/dicts/check-value</code></td>
+<td>检查使用次数</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/dicts</code></td>
+<td>创建</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/api/dicts/{did}</code></td>
+<td>更新</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/api/dicts/{did}</code></td>
+<td>删除</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/dict-categories</code></td>
+<td>字典分类列表</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/dict-categories</code></td>
+<td>创建分类</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/api/dict-categories/{cid}</code></td>
+<td>更新分类</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/api/dict-categories/{cid}</code></td>
+<td>删除分类</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_13">项目</h3>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>URL</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET</td>
+<td><code>/api/projects</code></td>
+<td>列表</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/projects</code></td>
+<td>创建（自动生成 HG-YYYY-NNN 编码）</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/api/projects/{pid}</code></td>
+<td>更新</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/api/projects/{pid}</code></td>
+<td>删除</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_14">销售人员</h3>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>URL</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET</td>
+<td><code>/api/sales</code></td>
+<td>列表</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/sales</code></td>
+<td>创建</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/api/sales/{sid}</code></td>
+<td>更新</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/api/sales/{sid}</code></td>
+<td>删除</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/sales/stats</code></td>
+<td>项目关联统计</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_15">出差报销</h3>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>URL</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET</td>
+<td><code>/api/trips</code></td>
+<td>出差单列表</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/trips/stats</code></td>
+<td>统计（年份/状态分组）</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/trips/{tid}</code></td>
+<td>详情（含费用明细）</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/trips</code></td>
+<td>创建</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/api/trips/{tid}</code></td>
+<td>更新</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/api/trips/{tid}</code></td>
+<td>删除（级联）</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/trip-expenses</code></td>
+<td>创建费用明细（自动重算总费用）</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/api/trip-expenses/{eid}</code></td>
+<td>更新</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/api/trip-expenses/{eid}</code></td>
+<td>删除</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_16">问题记录</h3>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>URL</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET</td>
+<td><code>/api/issues</code></td>
+<td>列表（类型/状态/产品/严重度筛选）</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/issues/{iid}</code></td>
+<td>详情（LEFT JOIN product_catalog）</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/issues</code></td>
+<td>创建</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/api/issues/{iid}</code></td>
+<td>更新</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/api/issues/{iid}</code></td>
+<td>删除</td>
+</tr>
+</tbody>
+</table>
+<h3 id="ai-llm">AI / LLM</h3>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>URL</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET</td>
+<td><code>/api/ai/profiles</code></td>
+<td>所有配置</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/ai/profiles/default</code></td>
+<td>默认模型</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/ai/profiles</code></td>
+<td>创建</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/api/ai/profiles/{pid}</code></td>
+<td>更新</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/api/ai/profiles/{pid}</code></td>
+<td>删除</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/ai/profiles/{pid}/set-default</code></td>
+<td>设为默认</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/ai/test-connection</code></td>
+<td>测试连接</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/ai/list-models</code></td>
+<td>拉取模型列表</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/ai/auto-classify</code></td>
+<td>AI 智能分类</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/ai/analyze</code></td>
+<td>AI 分析</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_17">风险管理</h3>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>URL</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET</td>
+<td><code>/api/risks</code></td>
+<td>列表（按项目）</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/risks</code></td>
+<td>创建</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/api/risks/{rid}</code></td>
+<td>更新</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/api/risks/{rid}</code></td>
+<td>删除</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_18">用户画像</h3>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>URL</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET</td>
+<td><code>/api/personas</code></td>
+<td>列表（按项目）</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/personas</code></td>
+<td>创建</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/api/personas/{pid}</code></td>
+<td>更新</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/api/personas/{pid}</code></td>
+<td>删除</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_19">服务器管理</h3>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>URL</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET</td>
+<td><code>/api/servers</code></td>
+<td>列表（含磁盘）</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/servers</code></td>
+<td>创建</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/api/servers/{sid}</code></td>
+<td>更新</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/api/servers/{sid}</code></td>
+<td>删除（级联磁盘）</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/server-disks</code></td>
+<td>创建磁盘</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/api/server-disks/{did}</code></td>
+<td>更新磁盘</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/api/server-disks/{did}</code></td>
+<td>删除磁盘</td>
+</tr>
+</tbody>
+</table>
+<h3 id="wbs">WBS / 里程碑</h3>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>URL</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET</td>
+<td><code>/api/wbs-items</code></td>
+<td>列表</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/wbs-items</code></td>
+<td>创建</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/api/wbs-items/{wid}</code></td>
+<td>更新</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/api/wbs-items/{wid}</code></td>
+<td>删除</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/wbs-scenarios</code></td>
+<td>场景列表（含关联项和权重）</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/wbs-scenarios</code></td>
+<td>创建场景</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/api/wbs-scenarios/{sid}</code></td>
+<td>更新场景</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/api/wbs-scenarios/{sid}</code></td>
+<td>删除场景</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_20">产品管理</h3>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>URL</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET</td>
+<td><code>/api/product-catalog</code></td>
+<td>目录（按层级/父级）</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/product-catalog</code></td>
+<td>创建</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/api/product-catalog/{cid}</code></td>
+<td>更新</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/api/product-catalog/{cid}</code></td>
+<td>删除（级联子项）</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/product-plans</code></td>
+<td>规划列表</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/product-plans</code></td>
+<td>创建规划</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/api/product-plans/{pid}</code></td>
+<td>更新规划</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/api/product-plans/{pid}</code></td>
+<td>删除规划</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/product-releases</code></td>
+<td>发布列表</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/product-releases</code></td>
+<td>创建发布</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/api/product-releases/{rid}</code></td>
+<td>更新发布</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/api/product-releases/{rid}</code></td>
+<td>删除发布</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/service-catalog</code></td>
+<td>服务目录</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/service-catalog</code></td>
+<td>创建</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/api/service-catalog/{cid}</code></td>
+<td>更新</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/api/service-catalog/{cid}</code></td>
+<td>删除（级联子项）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_21">优先级准则 &amp; 典型案例</h3>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>URL</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET</td>
+<td><code>/api/priority-criteria</code></td>
+<td>列表</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/priority-criteria</code></td>
+<td>创建</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/api/priority-criteria/{cid}</code></td>
+<td>更新</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/api/priority-criteria/{cid}</code></td>
+<td>删除</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/typical-issues</code></td>
+<td>列表</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/typical-issues</code></td>
+<td>创建</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/api/typical-issues/{iid}</code></td>
+<td>更新</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/api/typical-issues/{iid}</code></td>
+<td>删除</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_22">前端日志</h3>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>URL</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>POST</td>
+<td><code>/api/logs/frontend</code></td>
+<td>前端 JS 错误上报（window.onerror自动调用）</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="_23">侧栏导航结构</h2>
+<pre class="codehilite"><code>┌─ 一级导航 ──────────────────────┐
+│ 📝 录入工作                     │
+│ 📋 工作记录列表                 │
+│ 📊 项目工时统计                 │
+│ 📋 待办事项                     │
+│ ⚠️ 工作积压                     │
+│ ⏰ 加班记录                     │
+│ ✨ AI 智能分析                  │
+│ 💰 财务报销                     │
+│ 🐛 问题记录                     │
+├─ 项目管理 ▼ ───────────────────├
+│ 🏢 项目信息                     │
+│ 👥 销售人员                     │
+│ 👤 用户画像                     │
+│ ⚠️ 风险管理                     │
+│ 🌳 里程碑管理                   │
+│ 🖥️ 服务器管理                   │
+├─ 产品服务 ▼ ───────────────────├
+│ ✅ 兼容证明                     │
+│ 🌿 兼容流程                     │
+│ 🎛️ 产品规划                     │
+│ 🏪 产品超市                     │
+│ 📂 产品目录                     │
+│ 🔧 服务目录                     │
+├─ 字典维护 ▼ ───────────────────├
+│ ⚙️ 常规字典                     │
+│ 📏 优先级准则                   │
+│ 🐛 典型案例库                   │
+│ 🧠 LLM 模型管理                 │
+└─────────────────────────────────┘
+  📊 记录总数：XXX 条
+  🤖 默认模型名
+</code></pre>
+
+<hr />
+<h2 id="_24">开发指南</h2>
+<h3 id="_25">新增模块步骤</h3>
+<ol>
+<li><strong>数据库</strong>：<code>server.py</code> → <code>init_db()</code> 追加 <code>CREATE TABLE IF NOT EXISTS</code> / <code>ALTER TABLE</code> 迁移</li>
+<li><strong>后端 API</strong>：<code>server.py</code> → 追加 CRUD 路由（参考已有模块模式：Pydantic 模型 + <code>get_db()</code>）</li>
+<li><strong>前端 DB 层</strong>：<code>src/db/</code> → 新建 <code>xxx.js</code>，封装 API 调用</li>
+<li><strong>前端组件</strong>：<code>src/components/</code> → 新建 <code>XxxManager.jsx</code></li>
+<li><strong>注册路由</strong>：<code>Layout.jsx</code> → <code>pages</code> 对象 + import</li>
+<li><strong>加到导航</strong>：<code>Sidebar.jsx</code> → <code>navItems</code> / <code>projectChildren</code> / <code>productServiceChildren</code> / <code>dictChildren</code></li>
+</ol>
+<h3 id="_26">代码规范</h3>
+<ul>
+<li><strong>组件命名</strong>：一律以功能命名如 <code>IssueTracker</code>、<code>ExpenseManager</code></li>
+<li><strong>后端 model</strong>：统一用 <code>BaseModel</code> + <code>Optional</code> 做更新校验</li>
+<li><strong>删除确认</strong>：所有删除操作必须加确认弹窗</li>
+<li><strong>数据库迁移</strong>：新加列一律用 <code>try: ALTER TABLE ... ADD COLUMN ... except: pass</code> 模式</li>
+<li><strong>数据保护</strong>：任何操作不得删除 <code>oa_data.db</code></li>
+</ul>
+<h3 id="datagrid-v6-api">⚠️ DataGrid v6 API（极易踩坑）</h3>
+<p>项目安装的是 <code>@mui/x-data-grid</code> <strong>v6.20.4</strong>，以下 API 与 v7 完全不同：</p>
+<pre class="codehilite"><code class="language-jsx">// ✅ v6 正确写法
+&lt;DataGrid
+  rows={data}
+  columns={columns}
+  pageSize={25}                         // NOT pageSizeOptions
+  rowsPerPageOptions={[25, 50, 100]}    // NOT pageSizeOptions
+  disableSelectionOnClick               // NOT disableRowSelectionOnClick
+/&gt;
+
+// valueFormatter 参数是对象 {value, field, api}，不是原始值
+✅ valueFormatter: ({ value }) =&gt; value ? value.slice(0, 10) : ''
+❌ valueFormatter: (v) =&gt; v.slice(0, 10)  // $.slice is not a function!
+
+// valueGetter 参数是对象 {value, row, id, field, api}
+✅ valueGetter: (params) =&gt; params.row.name || params.value || '-'
+❌ valueGetter: (v, row) =&gt; row.name  // row is undefined!
+
+// renderCell 参数是对象 {value, row, id, field, ...}
+✅ renderCell: (p) =&gt; &lt;Chip label={p.value} /&gt;
+</code></pre>
+
+<h3 id="_27">构建后验证（必须执行）</h3>
+<pre class="codehilite"><code class="language-bash"># 1. 构建
+cd oa-system &amp;&amp; npx vite build
+
+# 2. 重启服务
+# （杀掉旧 python 进程 → 重新启动 server.py）
+
+# 3. 触发新页面 API
+curl -s http://127.0.0.1:8089/api/issues | head -c 100
+
+# 4. 检查前端错误日志 — 这步最重要！
+cat oa-system/logs/frontend.log | tail -20
+cat oa-system/logs/error.log | tail -5
+</code></pre>
+
+<h3 id="_28">默认技术栈</h3>
+<ul>
+<li>新组件优先使用 MUI X DataGrid 做表格，支持筛选和分页</li>
+<li>状态管理用 React <code>useState</code> + <code>useEffect</code>，复杂状态用 <code>useReducer</code></li>
+</ul>
+<hr />
+<blockquote>
+<p>文档生成日期：2026-06-18
+最后更新功能：日志系统 + DataGrid v6 API 陷阱文档化</p>
+</blockquote>
+</body>
+</html>

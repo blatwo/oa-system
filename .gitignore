@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+
+# Build output
+dist/
+public/*.wasm
+
+# Database & backups (contains user data)
+oa_data.db
+oa_data.bak.*
+
+# Logs
+logs/
+*.log
+
+# Environment
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Workbuddy
+.workbuddy/memory/

@@ -1,0 +1,53 @@
+============================================================
+项目状态达成条件 — QA 集成测试
+API Base: http://localhost:8089/api
+============================================================
+
+--- SETUP ---
+  测试项目: id=503, name=hg-兰州中介-吕华5907, status=进行中
+
+>>> Starting 01: 空条件查询
+    返回 0 条条件
+<<< 01: 空条件查询 DONE
+
+>>> Starting 02: 创建条件
+    创建条件 IDs: [134, 135, 136]
+<<< 02: 创建条件 DONE
+
+>>> Starting 03: 获取已有条件
+<<< 03: 获取已有条件 DONE
+
+>>> Starting 04: 勾选/取消
+    勾选后: is_met=1, met_date=2026-06-27 15:17:08
+    取消后: is_met=0, met_date=
+<<< 04: 勾选/取消 DONE
+
+>>> Starting 05: 修改条件描述
+<<< 05: 修改条件描述 DONE
+
+>>> Starting 06: 删除条件
+<<< 06: 删除条件 DONE
+
+>>> Starting 07: check-status 未达成
+    can_change=False, met=0/3
+    unmet_list=['所有功能测试通过', '客户确认验收', '文档交付完成']
+<<< 07: check-status 未达成 DONE
+
+>>> Starting 08: check-status 全部达成
+    can_change=True, met=3/3
+<<< 08: check-status 全部达成 DONE
+
+>>> Starting 09: 拒绝变更
+    项目当前状态: 进行中
+    返回错误信息: {"detail":"还有 3 项条件未达成：所有功能测试通过、客户确认验收、文档交付完成"}...
+<<< 09: 拒绝变更 DONE
+
+>>> Starting 10: 允许变更+日志
+    状态变更成功: hg-兰州中介-吕华5907 → 已完成
+    日志记录: action=status_change, from=进行中 → to=已完成
+<<< 10: 允许变更+日志 DONE
+
+>>> Starting 11: 日志完整性
+    日志中的 action 类型: {'status_change', 'condition_unmet', 'condition_met'}
+    匹配的 action 类型: {'status_change', 'condition_unmet', 'condition_met'}
+<<< 11: 日志完整性 DONE
