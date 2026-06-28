@@ -34,6 +34,7 @@ import CalculateIcon from '@mui/icons-material/Calculate';
 import FingerprintIcon from '@mui/icons-material/Fingerprint';
 import BuildIcon from '@mui/icons-material/Build';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import StorageIcon from '@mui/icons-material/Storage';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import { useWorkContext } from '../context/WorkContext';
@@ -82,6 +83,7 @@ const projectChildren = [
 const toolChildren = [
   { key: 'lsn', label: 'LSN 分析', icon: <CalculateIcon /> },
   { key: 'sysid', label: '系统标识符分析', icon: <FingerprintIcon /> },
+  { key: 'patroni_etcd', label: 'Patroni/etcd 调试', icon: <StorageIcon /> },
 ];
 
 const adminItems = [

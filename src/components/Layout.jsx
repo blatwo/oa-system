@@ -41,6 +41,7 @@ import ScriptManager from './ScriptManager';
 import WorkTemplateManager from './WorkTemplateManager';
 import LsnAnalyzer from './LsnAnalyzer';
 import SysidAnalyzer from './SysidAnalyzer';
+import PatroniEtcdDebug from './PatroniEtcdDebug';
 import ProjectConditionManager from './ProjectConditionManager';
 import ErrorBoundary from './ErrorBoundary';
 
@@ -76,6 +77,7 @@ const pages = {
   work_templates: WorkTemplateManager,
   lsn: LsnAnalyzer,
   sysid: SysidAnalyzer,
+  patroni_etcd: PatroniEtcdDebug,
   expense: ExpenseManager,
   condition: ProjectConditionManager,
 };

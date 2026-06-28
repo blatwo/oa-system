@@ -1768,6 +1768,124 @@ def apply_conditions_template(pid: int, body: ApplyTemplateBody):
     return [dict(r) for r in rows]
 
 
+# --- Patroni / etcd Debug API ---
+import json as _json
+import urllib.request as _urllib_request
+import urllib.error as _urllib_error
+import base64 as _base64
+import ssl as _ssl
+
+
+class EtcdRequestBody(BaseModel):
+    endpoints: str = ''            # 逗号分隔，如 "http://10.0.0.1:2379,http://10.0.0.2:2379"
+    username: str = ''             # 可选 basic auth
+    password: str = ''
+    path: str = '/service/batman'  # etcd key 路径
+    timeout: int = 5               # 秒
+
+
+@app.post("/api/debug/etcd/list")
+def debug_etcd_list(body: EtcdRequestBody):
+    """列出 etcd 路径下所有 key-value（用于 Patroni 集群调试）"""
+    endpoints = [e.strip() for e in body.endpoints.split(',') if e.strip()]
+    if not endpoints:
+        raise HTTPException(400, "请提供至少一个 etcd endpoint")
+
+    results = []
+    for ep in endpoints:
+        url = ep.rstrip('/') + '/v3' if '/v3' not in ep else ep
+        # Range query
+        req_body = _json.dumps({
+            "key": _base64.b64encode(body.path.encode()).decode(),
+            "range_end": _base64.b64encode(b'\xff').decode(),
+        }).encode()
+        req = _urllib_request.Request(
+            url + '/kv/range',
+            data=req_body,
+            headers={'Content-Type': 'application/json'},
+            method='POST',
+        )
+        if body.username:
+            import base64 as _b64
+            token = _b64.b64encode(f"{body.username}:{body.password}".encode()).decode()
+            req.add_header('Authorization', f'Basic {token}')
+        ctx = _ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = _ssl.CERT_NONE
+        try:
+            with _urllib_request.urlopen(req, timeout=body.timeout, context=ctx) as resp:
+                payload = _json.loads(resp.read().decode())
+                kvs = []
+                for kv in payload.get('kvs', []):
+                    key = _base64.b64decode(kv['key']).decode('utf-8', errors='replace')
+                    val = _base64.b64decode(kv['value']).decode('utf-8', errors='replace')
+                    kvs.append({
+                        'key': key,
+                        'value': val,
+                        'version': kv.get('version'),
+                        'mod_revision': kv.get('mod_revision'),
+                    })
+                results.append({'endpoint': ep, 'ok': True, 'count': len(kvs), 'kvs': kvs})
+        except _urllib_error.HTTPError as e:
+            results.append({'endpoint': ep, 'ok': False, 'error': f'HTTP {e.code}: {e.reason}'})
+        except Exception as e:
+            results.append({'endpoint': ep, 'ok': False, 'error': str(e)})
+
+    return {'path': body.path, 'results': results}
+
+
+class PatroniMemberBody(BaseModel):
+    endpoints: str = ''
+    scope: str = 'batman'   # Patroni cluster scope
+
+
+@app.post("/api/debug/patroni/cluster")
+def debug_patroni_cluster(body: PatroniMemberBody):
+    """Patroni REST API 查询集群状态（默认 http://host:8008/cluster）"""
+    endpoints = [e.strip() for e in body.endpoints.split(',') if e.strip()]
+    if not endpoints:
+        raise HTTPException(400, "请提供至少一个 Patroni REST endpoint (host:8008)")
+
+    results = []
+    ctx = _ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = _ssl.CERT_NONE
+
+    for ep in endpoints:
+        # 自动补 http:// 和 /cluster
+        if not ep.startswith('http'):
+            ep = 'http://' + ep
+        if not ep.endswith('/cluster'):
+            ep = ep.rstrip('/') + '/cluster'
+
+        try:
+            with _urllib_request.urlopen(ep, timeout=5, context=ctx) as resp:
+                payload = _json.loads(resp.read().decode())
+                # 精简输出：只保留关键字段
+                members = []
+                for m in payload.get('members', []):
+                    members.append({
+                        'name': m.get('name'),
+                        'role': m.get('role'),
+                        'state': m.get('state'),
+                        'host': m.get('host'),
+                        'port': m.get('port'),
+                        'lag': m.get('lag'),
+                        'timeline': m.get('timeline'),
+                    })
+                results.append({
+                    'endpoint': ep,
+                    'ok': True,
+                    'scope': payload.get('scope'),
+                    'patroni_version': payload.get('patroni', {}).get('version'),
+                    'members': members,
+                })
+        except Exception as e:
+            results.append({'endpoint': ep, 'ok': False, 'error': str(e)})
+
+    return {'scope': body.scope, 'results': results}
+
+
 # --- Trip Management (Financial Reimbursement) APIs ---
 
 class TripCreate(BaseModel):

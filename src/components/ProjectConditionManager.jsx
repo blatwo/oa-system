@@ -22,28 +22,19 @@ import {
   Tooltip,
   Snackbar,
   Alert,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
-import PlaylistAddCheckIcon from '@mui/icons-material/PlaylistAddCheck';
 import {
   getConditionTemplates,
   saveConditionTemplates,
   updateConditionTemplate,
   deleteConditionTemplate,
-  applyTemplateToProject,
 } from '../db/projects';
-import { getAllProjects } from '../db/projects';
-
-/** 支持的目标状态列表（后续可扩展） */
-const TARGET_STATUSES = ['已完成'];
+import { getDictByCategory } from '../db/dictionaries';
 
 export default function ProjectConditionManager() {
   const [tabIndex, setTabIndex] = useState(0);
@@ -60,18 +51,17 @@ export default function ProjectConditionManager() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
 
-  // 应用到项目
-  const [applyDialogOpen, setApplyDialogOpen] = useState(false);
-  const [projects, setProjects] = useState([]);
-  const [selectedProjectId, setSelectedProjectId] = useState('');
+  // 状态列表（从字典动态加载）— 字符串数组
+  const [statusOptions, setStatusOptions] = useState([]);
 
   // Snackbar
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
-  const currentStatus = TARGET_STATUSES[tabIndex];
+  const currentStatus = statusOptions[tabIndex] || '';
 
   /** 加载当前 Tab 的模板列表 */
   const loadItems = useCallback(async () => {
+    if (!currentStatus) return;
     try {
       setLoading(true);
       const data = await getConditionTemplates(currentStatus);
@@ -84,13 +74,35 @@ export default function ProjectConditionManager() {
     }
   }, [currentStatus]);
 
+  /** 加载字典中的状态选项 */
+  const loadStatusOptions = useCallback(async () => {
+    try {
+      const data = await getDictByCategory('status');
+      // getDictByCategory 返回字符串数组；如果将来改成对象数组也能兼容
+      const list = Array.isArray(data)
+        ? data.map(item => typeof item === 'string' ? item : (item.value || item.name || '')).filter(Boolean)
+        : [];
+      setStatusOptions(list);
+    } catch (err) {
+      console.error('加载状态字典失败:', err);
+      setSnackbar({ open: true, message: '加载状态字典失败: ' + err.message, severity: 'error' });
+    }
+  }, []);
+
   useEffect(() => {
-    loadItems();
-  }, [loadItems]);
+    loadStatusOptions();
+  }, [loadStatusOptions]);
+
+  useEffect(() => {
+    if (currentStatus) loadItems();
+  }, [loadItems, currentStatus]);
 
   /** 切换 Tab */
   const handleTabChange = (_event, newValue) => {
     setTabIndex(newValue);
+    if (newValue >= statusOptions.length) {
+      setTabIndex(0);
+    }
   };
 
   /** 打开添加对话框 */
@@ -178,37 +190,6 @@ export default function ProjectConditionManager() {
     await loadItems();
   };
 
-  /** 打开"应用到项目"对话框 */
-  const handleApplyDialogOpen = async () => {
-    if (items.length === 0) {
-      setSnackbar({ open: true, message: '当前状态没有模板条件，请先添加', severity: 'warning' });
-      return;
-    }
-    try {
-      const allProjects = await getAllProjects();
-      setProjects(allProjects);
-      setSelectedProjectId('');
-      setApplyDialogOpen(true);
-    } catch (err) {
-      setSnackbar({ open: true, message: '加载项目列表失败: ' + err.message, severity: 'error' });
-    }
-  };
-
-  /** 确认应用到项目 */
-  const handleApplyConfirm = async () => {
-    if (!selectedProjectId) {
-      setSnackbar({ open: true, message: '请选择一个项目', severity: 'warning' });
-      return;
-    }
-    try {
-      await applyTemplateToProject(Number(selectedProjectId), currentStatus);
-      setSnackbar({ open: true, message: '模板已成功应用到项目', severity: 'success' });
-      setApplyDialogOpen(false);
-    } catch (err) {
-      setSnackbar({ open: true, message: '应用失败: ' + err.message, severity: 'error' });
-    }
-  };
-
   return (
     <Box>
       <Paper elevation={2} sx={{ p: { xs: 2, md: 3 }, borderRadius: 2 }}>
@@ -219,13 +200,13 @@ export default function ProjectConditionManager() {
         {/* 状态 Tabs */}
         <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
           <Tabs
-            value={tabIndex}
+            value={tabIndex < statusOptions.length ? tabIndex : 0}
             onChange={handleTabChange}
             variant="scrollable"
             scrollButtons="auto"
           >
-            {TARGET_STATUSES.map((status, idx) => (
-              <Tab key={status} label={status} id={`condition-tab-${idx}`} />
+            {statusOptions.map((opt, idx) => (
+              <Tab key={opt} label={opt} id={`condition-tab-${idx}`} />
             ))}
           </Tabs>
         </Box>
@@ -236,15 +217,6 @@ export default function ProjectConditionManager() {
             {currentStatus} — {items.length} 项条件
           </Typography>
           <Box sx={{ display: 'flex', gap: 1 }}>
-            <Button
-              variant="outlined"
-              size="small"
-              color="secondary"
-              startIcon={<PlaylistAddCheckIcon />}
-              onClick={handleApplyDialogOpen}
-            >
-              应用到项目
-            </Button>
             <Button
               variant="contained"
               size="small"
@@ -411,42 +383,6 @@ export default function ProjectConditionManager() {
           <Button onClick={() => setDeleteDialogOpen(false)}>取消</Button>
           <Button onClick={handleDeleteConfirm} color="error" variant="contained">
             确认删除
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* 应用到项目对话框 */}
-      <Dialog
-        open={applyDialogOpen}
-        onClose={() => setApplyDialogOpen(false)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>应用模板到项目</DialogTitle>
-        <DialogContent>
-          <DialogContentText sx={{ mb: 2 }}>
-            将「{currentStatus}」状态的 {items.length} 条条件模板复制到指定项目。
-            目标项目中原有的该状态条件将被替换。
-          </DialogContentText>
-          <FormControl fullWidth size="small">
-            <InputLabel>选择项目</InputLabel>
-            <Select
-              value={selectedProjectId}
-              label="选择项目"
-              onChange={(e) => setSelectedProjectId(e.target.value)}
-            >
-              {projects.map((p) => (
-                <MenuItem key={p.id} value={String(p.id)}>
-                  {p.name} {p.code ? `(${p.code})` : ''}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setApplyDialogOpen(false)}>取消</Button>
-          <Button onClick={handleApplyConfirm} variant="contained" color="secondary">
-            确认应用
           </Button>
         </DialogActions>
       </Dialog>
