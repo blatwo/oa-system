@@ -82,11 +82,11 @@ cat logs/frontend.log
 
 ## 模块清单
 
-### 一级导航（9 项）
+### 一级导航（11 项）
 
 | 模块 | 页面键 | 组件 | 说明 |
 |------|--------|------|------|
-| 录入工作 | `form` | `WorkForm` | 工作记录录入表单，两列网格布局，含 AI 智能分类 |
+| 录入工作 | `form` | `WorkForm` | 工作记录录入表单，两列网格布局，含 AI 智能分类 + **质疑**（内容完整性检测）🆕 |
 | 工作记录列表 | `list` | `WorkList` | 工作记录 DataGrid，日期/项目筛选，批量删除，JSON 导入导出 |
 | 项目工时统计 | `stats` | `ProjectStats` | 按项目分组汇总工时 + BSC 分类统计 |
 | 待办事项 | `todo` | `TodoList` | 过滤含 todo 字段的记录，标记完成/删除 |
@@ -95,12 +95,15 @@ cat logs/frontend.log
 | AI 智能分析 | `ai` | `AIAnalysis` | 三种模式：项目总结/问题分析/自由提问 |
 | 财务报销 | `expense` | `ExpenseManager` | 出差单 + 费用明细管理，含统计汇总 |
 | 问题记录 | `issue_tracker` | `IssueTracker` | 问题/缺陷/操作记录/最佳实践追踪，关联产品版本 |
+| 工作模板 | `work_template` | `WorkTemplateManager` | 工作记录模板管理（快速填充常用工作）🆕 |
+| 实用工具 | `tools` | `SysidAnalyzer` / `LSNAnalyzer` / `PatroniEtcdDebug` | PostgreSQL System ID / LSN / Patroni&etcd 调试工具 🆕 |
 
-### 项目管理（6 项）
+### 项目管理（7 项）
 
 | 模块 | 页面键 | 组件 | 说明 |
 |------|--------|------|------|
-| 项目信息 | `project` | `ProjectManager` | 项目编码/名称/客户/ISV/状态/销售负责人 CRUD，DataGrid |
+| 项目信息 | `project` | `ProjectManager` | 项目编码/名称/客户/ISV/状态/销售负责人 CRUD，DataGrid，**状态变更条件校验** 🆕 |
+| 状态达成条件 | `condition` | `ProjectConditionManager` | 项目状态达成条件全局模板管理 + 应用到项目 🆕 |
 | 销售人员 | `sales` | `SalesManager` | 人员 CRUD + 销售-项目关联统计 |
 | 用户画像 | `persona` | `PersonaManager` | 按项目的商务面貌/技术面貌/痛点/关键人员/期望 |
 | 风险管理 | `risk` | `RiskManager` | 风险类型/等级/描述/影响/缓解措施/负责人/状态 |
@@ -114,11 +117,11 @@ cat logs/frontend.log
 | 兼容证明 | `compat` | `CompatibilityManager` | 项目/应用系统/状态/环节/开具信息/适配信息 |
 | 兼容流程 | `compat_flow` | `CompatFlow` | Stepper 展示，兼容环节通过字典维护 |
 | 产品规划 | `plan` | `ProductPlanManager` | 关联产品目录三级分类，状态(规划中/开发中/已发布/已下线) |
-| 产品超市 | `release` | `ProductMarketplace` | 产品版本/IP/销量/适配数/评分展示，支持排序 |
+| 产品超市 | `release` | `ProductReleaseManager` | 产品版本/IP/销量/适配数/评分展示，支持排序 |
 | 产品目录 | `catalog` | `ProductCatalogManager` | 三级树形层级（大类/系列/版本），CRUD |
 | 服务目录 | `svc` | `ServiceCatalogManager` | 三级树形层级（服务大类/分类/子项），CRUD |
 
-### 字典维护（4 项）
+### 字典维护（5 项）
 
 | 模块 | 页面键 | 组件 | 说明 |
 |------|--------|------|------|
@@ -126,40 +129,47 @@ cat logs/frontend.log
 | 优先级准则 | `priority` | `PriorityCriteria` | 重要/不重要/紧急/不紧急四象限 |
 | 典型案例库 | `issues` | `TypicalIssues` | 产品/场景/影响/发现人/服务分类 |
 | LLM 模型管理 | `llm` | `LLMProfiles` | 多模型配置/测试连接/设为默认 |
+| 脚本模板 | `script` | `ScriptManager` | SQL/shell 脚本模板管理（数据库运维常用脚本）🆕 |
 
 ---
 
 ## 数据库表结构
 
-总计 **25 张表**：
+总计 **31 张表**（最后更新 2026-06-28）：
 
 | # | 表名 | 用途 |
 |---|------|------|
 | 1 | `work_records` | 工作记录（主表） |
-| 2 | `dictionaries` | 字典项 |
-| 3 | `dict_categories` | 字典分类 |
-| 4 | `projects` | 项目信息 |
-| 5 | `sales` | 销售人员 |
-| 6 | `llm_profiles` | LLM 模型配置 |
-| 7 | `risks` | 风险管理 |
-| 8 | `expense_claims` | 报销单（旧平铺表，保留历史数据） |
-| 9 | `trips` | 出差单 |
-| 10 | `trip_expenses` | 出差费用明细（FK → trips） |
-| 11 | `issue_records` | 问题记录 |
-| 12 | `servers` | 服务器信息（80+ 字段） |
-| 13 | `server_disks` | 服务器磁盘信息（FK → servers） |
-| 14 | `priority_criteria` | 优先级准则 |
-| 15 | `typical_issues` | 典型案例库 |
-| 16 | `wbs_items` | WBS 项 |
-| 17 | `wbs_scenarios` | WBS 场景 |
-| 18 | `wbs_scenario_items` | WBS 场景-项关联 |
-| 19 | `personas` | 用户画像 |
-| 20 | `product_catalog` | 产品目录（三级层级） |
-| 21 | `product_plans` | 产品规划 |
-| 22 | `product_releases` | 产品发布/超市 |
-| 23 | `service_catalog` | 服务目录（三级层级） |
-| 24 | `overtimer` | 加班记录 |
-| 25 | `compatibility_certs` | 兼容证明 |
+| 2 | `work_templates` | 工作记录模板 🆕 |
+| 3 | `dictionaries` | 字典项 |
+| 4 | `dict_categories` | 字典分类 |
+| 5 | `projects` | 项目信息 |
+| 6 | `sales` | 销售人员 |
+| 7 | `llm_profiles` | LLM 模型配置 |
+| 8 | `risks` | 风险管理 |
+| 9 | `expense_claims` | 报销单（旧平铺表，保留历史数据） |
+| 10 | `trips` | 出差单 |
+| 11 | `trip_expenses` | 出差费用明细（FK → trips） |
+| 12 | `issue_records` | 问题记录 |
+| 13 | `servers` | 服务器信息（80+ 字段） |
+| 14 | `server_disks` | 服务器磁盘信息（FK → servers） |
+| 15 | `priority_criteria` | 优先级准则 |
+| 16 | `typical_issues` | 典型案例库 |
+| 17 | `wbs_items` | WBS 项 |
+| 18 | `wbs_scenarios` | WBS 场景 |
+| 19 | `wbs_scenario_items` | WBS 场景-项关联 |
+| 20 | `personas` | 用户画像 |
+| 21 | `product_catalog` | 产品目录（三级层级） |
+| 22 | `product_plans` | 产品规划 |
+| 23 | `product_releases` | 产品发布/超市 |
+| 24 | `service_catalog` | 服务目录（三级层级） |
+| 25 | `overtimer` | 加班记录 |
+| 26 | `compatibility_certs` | 兼容证明 |
+| 27 | `script_templates` | 脚本模板 🆕 |
+| 28 | `q2_goals` | Q2 季度目标 🆕 |
+| 29 | `project_status_conditions` | 项目状态达成条件 🆕 |
+| 30 | `project_status_condition_logs` | 状态条件操作审计日志 🆕 |
+| 31 | `sqlite_sequence` | SQLite 自增 ID 维护表（系统） |
 
 > **关键表字段说明见下方 API 章节，详细 PRAGMA 请查看 `init_db()` 函数。**
 
@@ -271,6 +281,32 @@ cat logs/frontend.log
 | POST | `/api/ai/list-models` | 拉取模型列表 |
 | POST | `/api/ai/auto-classify` | AI 智能分类 |
 | POST | `/api/ai/analyze` | AI 分析 |
+| POST | `/api/ai/auto-verify` | AI 内容完整性质疑 🆕 |
+
+### 项目状态条件 🆕
+| 方法 | URL | 说明 |
+|------|-----|------|
+| GET | `/api/projects/{pid}/status-conditions` | 项目的达成条件列表 |
+| POST | `/api/projects/{pid}/status-conditions` | 新增条件 |
+| PUT | `/api/projects/{pid}/status-conditions/{cid}` | 更新条件 |
+| DELETE | `/api/projects/{pid}/status-conditions/{cid}` | 删除条件 |
+| GET | `/api/projects/{pid}/check-status` | 检查状态流转前置条件 |
+| GET | `/api/projects/{pid}/status-logs` | 状态条件操作审计日志 |
+| GET | `/api/status-conditions/templates` | 全局条件模板（project_id=0） |
+| POST | `/api/status-conditions/templates` | 创建模板 |
+| PUT | `/api/status-conditions/templates/{cid}` | 更新模板 |
+| DELETE | `/api/status-conditions/templates/{cid}` | 删除模板 |
+| POST | `/api/projects/{pid}/apply-conditions-template` | 应用模板到项目 |
+
+### 工作模板 🆕
+| 方法 | URL | 说明 |
+|------|-----|------|
+| GET/POST/PUT/DELETE | `/api/work-templates` | 工作记录模板 CRUD |
+
+### 脚本模板 🆕
+| 方法 | URL | 说明 |
+|------|-----|------|
+| GET/POST/PUT/DELETE | `/api/script-templates` | SQL/shell 脚本模板 CRUD |
 
 ### 风险管理
 | 方法 | URL | 说明 |
@@ -363,8 +399,11 @@ cat logs/frontend.log
 │ ✨ AI 智能分析                  │
 │ 💰 财务报销                     │
 │ 🐛 问题记录                     │
+│ 📑 工作模板                     │
+│ 🛠️ 实用工具                     │
 ├─ 项目管理 ▼ ───────────────────├
 │ 🏢 项目信息                     │
+│ 🎯 状态达成条件                 │
 │ 👥 销售人员                     │
 │ 👤 用户画像                     │
 │ ⚠️ 风险管理                     │
@@ -382,6 +421,7 @@ cat logs/frontend.log
 │ 📏 优先级准则                   │
 │ 🐛 典型案例库                   │
 │ 🧠 LLM 模型管理                 │
+│ 📜 脚本模板                     │
 └─────────────────────────────────┘
   📊 记录总数：XXX 条
   🤖 默认模型名
@@ -458,5 +498,10 @@ cat oa-system/logs/error.log | tail -5
 
 ---
 
-> 文档生成日期：2026-06-18
-> 最后更新功能：日志系统 + DataGrid v6 API 陷阱文档化
+> 文档生成日期：2026-06-28
+> 最后更新功能：
+> - 🆕 AI 质疑（内容完整性质检）
+> - 🆕 项目状态达成条件（含全局模板）
+> - 🆕 工作模板、脚本模板
+> - 🆕 实用工具（System ID / LSN / Patroni-etcd）
+> - 🆕 数据库表扩展至 31 张
